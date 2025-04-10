@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CCTVVideoEditor (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "CCTVVideoEditor (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
