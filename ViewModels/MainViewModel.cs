@@ -9,6 +9,8 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Microsoft.UI.Dispatching;
+using System.Diagnostics;
 
 namespace CCTVVideoEditor.ViewModels
 {
@@ -177,6 +179,8 @@ namespace CCTVVideoEditor.ViewModels
         /// </summary>
         public Windows.Media.Playback.MediaPlayer MediaPlayer => _playbackService?.MediaPlayer;
 
+        private DispatcherQueue _dispatcherQueue;
+
         #endregion
 
         /// <summary>
@@ -184,6 +188,7 @@ namespace CCTVVideoEditor.ViewModels
         /// </summary>
         public MainViewModel()
         {
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
             _videoLoaderService = new VideoLoaderService();
             _timelineService = new TimelineService();
             _playbackService = new PlaybackService(_timelineService);
@@ -437,7 +442,26 @@ namespace CCTVVideoEditor.ViewModels
         /// </summary>
         protected void NotifyPropertyChanged([CallerMemberName] string propertyName = null)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (_dispatcherQueue == null)
+            {
+                // Fallback - just invoke directly if dispatcher is not available
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+                return;
+            }
+
+            if (_dispatcherQueue.HasThreadAccess)
+            {
+                // We're already on the UI thread, invoke directly
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+            else
+            {
+                // We're on a background thread, dispatch to UI thread
+                _dispatcherQueue.TryEnqueue(() =>
+                {
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+                });
+            }
         }
 
         #endregion
@@ -446,6 +470,7 @@ namespace CCTVVideoEditor.ViewModels
 
         private void TimelineService_CurrentSegmentChanged(object sender, VideoSegment e)
         {
+            Debug.WriteLine($"Segment changed to: {e?.StartTime:HH:mm:ss}, source: {sender?.GetType().Name}");
             CurrentSegment = e;
         }
 

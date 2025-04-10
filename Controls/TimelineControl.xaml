@@ -48,15 +48,6 @@
             <Setter Property="Y1" Value="0"/>
             <Setter Property="Y2" Value="50"/>
         </Style>
-
-        <!-- New styles for navigation -->
-        <Style x:Key="NavigationButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="{ThemeResource SystemControlBackgroundAltHighBrush}"/>
-            <Setter Property="BorderBrush" Value="{ThemeResource SystemControlForegroundBaseLowBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="CornerRadius" Value="2"/>
-        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -68,76 +59,27 @@
         </Grid.RowDefinitions>
 
         <!-- Timeline Controls -->
-        <Grid Grid.Row="0" Margin="0,0,0,5">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Zoom Controls -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="ZoomOutButton" Content="&#xE1A4;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="ZoomOutButton_Click"/>
-                <Slider x:Name="ZoomSlider" Width="100" Minimum="1" Maximum="24" Value="12" 
-                        Header="Zoom" ValueChanged="ZoomSlider_ValueChanged"/>
-                <Button x:Name="ZoomInButton" Content="&#xE1A3;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="ZoomInButton_Click"/>
-            </StackPanel>
-
-            <!-- Time Jump Controls -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button x:Name="GoToStartButton" Content="&#xE892;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToStartButton_Click"/>
-                <Button x:Name="GoToCurrentTimeButton" Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToCurrentTimeButton_Click"/>
-                <Button x:Name="GoToEndButton" Content="&#xE893;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToEndButton_Click"/>
-            </StackPanel>
-
-            <!-- Time Presets -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <ComboBox x:Name="TimePresetComboBox" SelectedIndex="0" Width="120" SelectionChanged="TimePresetComboBox_SelectionChanged">
-                    <ComboBoxItem Content="View All Day"/>
-                    <ComboBoxItem Content="Morning (6-12)"/>
-                    <ComboBoxItem Content="Afternoon (12-18)"/>
-                    <ComboBoxItem Content="Evening (18-24)"/>
-                    <ComboBoxItem Content="Night (0-6)"/>
-                </ComboBox>
-            </StackPanel>
-        </Grid>
-
-        <!-- New Time Navigation Bar -->
-        <Grid Grid.Row="1" Margin="0,0,0,5">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Go back 1 hour -->
-            <Button Grid.Column="0" 
-                    Content="◀ -1h" 
-                    Style="{StaticResource NavigationButtonStyle}"
-                    Click="GoBackHour_Click"
-                    ToolTipService.ToolTip="Go back 1 hour"/>
-
-            <!-- Time Jump Buttons -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button Content="00:00" Style="{StaticResource NavigationButtonStyle}" Margin="2,0" Click="TimeJump_Click" Tag="00:00"/>
-                <Button Content="06:00" Style="{StaticResource NavigationButtonStyle}" Margin="2,0" Click="TimeJump_Click" Tag="06:00"/>
-                <Button Content="12:00" Style="{StaticResource NavigationButtonStyle}" Margin="2,0" Click="TimeJump_Click" Tag="12:00"/>
-                <Button Content="18:00" Style="{StaticResource NavigationButtonStyle}" Margin="2,0" Click="TimeJump_Click" Tag="18:00"/>
-                <Button Content="21:00" Style="{StaticResource NavigationButtonStyle}" Margin="2,0" Click="TimeJump_Click" Tag="21:00"/>
-            </StackPanel>
-
-            <!-- Go forward 1 hour -->
-            <Button Grid.Column="2" 
-                    Content="+1h ▶" 
-                    Style="{StaticResource NavigationButtonStyle}"
-                    Click="GoForwardHour_Click"
-                    ToolTipService.ToolTip="Go forward 1 hour"/>
-        </Grid>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,5">
+            <Button x:Name="ZoomOutButton" Content="&#xE1A4;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="ZoomOutButton_Click"/>
+            <Slider x:Name="ZoomSlider" Width="100" Minimum="1" Maximum="24" Value="12" 
+                    Header="Zoom" ValueChanged="ZoomSlider_ValueChanged"/>
+            <Button x:Name="ZoomInButton" Content="&#xE1A3;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="ZoomInButton_Click"/>
+            <TextBlock Text="|" Margin="10,0" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
+            <Button x:Name="GoToStartButton" Content="&#xE892;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToStartButton_Click"/>
+            <Button x:Name="GoToCurrentTimeButton" Content="&#xE8D2;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToCurrentTimeButton_Click"/>
+            <Button x:Name="GoToEndButton" Content="&#xE893;" FontFamily="Segoe MDL2 Assets" Margin="5,0" Click="GoToEndButton_Click"/>
+        </StackPanel>
 
         <!-- Timeline Container -->
-        <ScrollViewer Grid.Row="2" x:Name="TimelineScrollViewer" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Disabled"
-                     Height="70" ViewChanged="TimelineScrollViewer_ViewChanged">
-            <Grid x:Name="TimelineContainer" MinHeight="70">
+        <!-- Timeline Container -->
+        <ScrollViewer Grid.Row="1" x:Name="TimelineScrollViewer" 
+              HorizontalScrollBarVisibility="Visible"
+              VerticalScrollBarVisibility="Disabled"
+              HorizontalScrollMode="Enabled"
+              VerticalScrollMode="Disabled"
+              Height="70" 
+              ViewChanged="TimelineScrollViewer_ViewChanged">
+            <Grid x:Name="TimelineContainer" MinHeight="70" Background="Transparent">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="25"/>
                     <!-- For time ticks -->
@@ -151,7 +93,7 @@
                 <Canvas x:Name="TicksCanvas" Grid.Row="0" HorizontalAlignment="Left"/>
 
                 <!-- Canvas for video segments and gaps -->
-                <Canvas x:Name="SegmentsCanvas" Grid.Row="1" HorizontalAlignment="Left" ManipulationMode="TranslateX" ManipulationDelta="TimelineCanvas_ManipulationDelta"/>
+                <Canvas x:Name="SegmentsCanvas" Grid.Row="1" HorizontalAlignment="Left"/>
 
                 <!-- Canvas for selection and current position -->
                 <Canvas x:Name="SelectionCanvas" Grid.Row="2" HorizontalAlignment="Left"/>
@@ -160,6 +102,14 @@
                 <Line x:Name="CurrentPositionLine" Style="{StaticResource TimelinePositionStyle}" Grid.RowSpan="3"/>
             </Grid>
         </ScrollViewer>
+
+        <!-- Timeline Navigator (Mini Timeline) -->
+        <Grid Grid.Row="2" Margin="0,5,0,5" Height="20" Background="{ThemeResource SystemControlBackgroundListLowBrush}">
+            <Rectangle x:Name="NavigatorView" Fill="{ThemeResource SystemControlBackgroundListMediumBrush}" 
+                     Height="20" HorizontalAlignment="Left" PointerPressed="NavigatorView_PointerPressed" 
+                     PointerMoved="NavigatorView_PointerMoved" PointerReleased="NavigatorView_PointerReleased" />
+            <Canvas x:Name="NavigatorCanvas" Height="20" HorizontalAlignment="Stretch" />
+        </Grid>
 
         <!-- Timeline Info -->
         <Grid Grid.Row="3" Margin="0,5,0,0">

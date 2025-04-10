@@ -1,6 +1,7 @@
 ﻿using CCTVVideoEditor.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -70,6 +71,7 @@ namespace CCTVVideoEditor.Services
             if (_timelineData == null)
                 return false;
 
+            Debug.WriteLine($"Setting position to: {position:HH:mm:ss}");
             // Update current position
             _currentPosition = position;
 
@@ -79,6 +81,7 @@ namespace CCTVVideoEditor.Services
             // Only notify segment change if it's different
             if (segment != _currentSegment)
             {
+                Debug.WriteLine($"Changing segment from {_currentSegment?.StartTime:HH:mm:ss} to {segment?.StartTime:HH:mm:ss}");
                 _currentSegment = segment;
                 CurrentSegmentChanged?.Invoke(this, _currentSegment);
             }
@@ -88,6 +91,20 @@ namespace CCTVVideoEditor.Services
 
             // Return true if segment found
             return segment != null;
+        }
+
+
+        public void ForceSegmentChange(VideoSegment segment)
+        {
+            if (segment != null)
+            {
+                _currentSegment = segment;
+                _currentPosition = segment.StartTime;
+
+                // Notify changes
+                CurrentSegmentChanged?.Invoke(this, _currentSegment);
+                CurrentPositionChanged?.Invoke(this, _currentPosition);
+            }
         }
 
         /// <summary>

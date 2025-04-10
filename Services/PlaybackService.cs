@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage;
+using Microsoft.UI.Dispatching;
 
 namespace CCTVVideoEditor.Services
 {
@@ -47,12 +48,22 @@ namespace CCTVVideoEditor.Services
         /// Creates a new PlaybackService
         /// </summary>
         /// <param name="timelineService">Timeline service</param>
+        /// 
+        private DispatcherQueue _dispatcherQueue;
+        public bool _isManualSelection = false;
+        private bool _disableAutoAdvancement = false;
+        private DateTime _autoAdvancementDisabledTime = DateTime.MinValue;
+        private const int AUTO_ADVANCEMENT_DISABLE_SECONDS = 5;
+
         public PlaybackService(TimelineService timelineService)
         {
             _timelineService = timelineService;
             _continuousPlayback = true;
             _isPreloadingNext = false;
             _isTransitioning = false;
+
+            // Get the dispatcher for the current thread
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
             InitializeMediaPlayer();
         }
@@ -86,14 +97,18 @@ namespace CCTVVideoEditor.Services
 
             try
             {
-                // Stop current playback
+                // Debug log
+                Debug.WriteLine($"Playing segment: {segment.StartTime:HH:mm:ss}, Manual: {_isManualSelection}");
+
+                // Stop current playback and clear source
                 _mediaPlayer.Pause();
+                _mediaPlayer.Source = null;
 
                 // Set current segment
                 _currentSegment = segment;
 
-                // Update timeline service
-                _timelineService.SetPosition(segment.StartTime);
+                // Update timeline service - force a segment change notification
+                _timelineService.ForceSegmentChange(segment);
 
                 // Load the media
                 await LoadMediaSourceAsync(segment);
@@ -104,8 +119,8 @@ namespace CCTVVideoEditor.Services
                 // Notify playback started
                 PlaybackStarted?.Invoke(this, segment);
 
-                // Preload next segment if continuous playback is enabled
-                if (_continuousPlayback)
+                // Only preload next segment for automatic playback
+                if (_continuousPlayback && !_isManualSelection && !_isManualSelection)
                 {
                     await PreloadNextSegmentAsync();
                 }
@@ -166,33 +181,56 @@ namespace CCTVVideoEditor.Services
         /// <returns>True if successful</returns>
         public async Task<bool> SeekToTimeAsync(DateTime targetTime)
         {
-            // Find segment at the target time
-            var segment = _timelineService.FindSegmentAtTime(targetTime);
-
-            if (segment == null)
+            try
             {
-                // No segment at target time
-                PlaybackError?.Invoke(this, "No video footage at the specified time");
+                // Mark this as a manual selection
+                _isManualSelection = true;
+
+                // Find segment at the target time
+                var segment = _timelineService.FindSegmentAtTime(targetTime);
+
+                if (segment == null)
+                {
+                    // No segment at target time
+                    _isManualSelection = false;
+                    PlaybackError?.Invoke(this, "No video footage at the specified time");
+                    return false;
+                }
+
+                // Load and play the segment directly
+                await PlaySegmentAsync(segment);
+
+                // Seek to offset within segment if needed
+                double offsetSeconds = (targetTime - segment.StartTime).TotalSeconds;
+                if (offsetSeconds > 0)
+                {
+                    SeekToPosition(offsetSeconds);
+                }
+
+                _isManualSelection = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _isManualSelection = false;
+                System.Diagnostics.Debug.WriteLine($"Error in SeekToTimeAsync: {ex.Message}");
+                return false;
+            }
+        }
+
+        private bool ShouldDisableAutoAdvancement()
+        {
+            if (!_disableAutoAdvancement)
+                return false;
+
+            // Check if enough time has passed to re-enable auto-advancement
+            if ((DateTime.Now - _autoAdvancementDisabledTime).TotalSeconds > AUTO_ADVANCEMENT_DISABLE_SECONDS)
+            {
+                _disableAutoAdvancement = false;
                 return false;
             }
 
-            if (segment == _currentSegment)
-            {
-                // Target time is in current segment, just seek
-                double offsetSeconds = (targetTime - segment.StartTime).TotalSeconds;
-                SeekToPosition(offsetSeconds);
-                return true;
-            }
-            else
-            {
-                // Target time is in different segment, load it
-                await PlaySegmentAsync(segment);
-
-                // Seek to offset within new segment
-                double offsetSeconds = (targetTime - segment.StartTime).TotalSeconds;
-                SeekToPosition(offsetSeconds);
-                return true;
-            }
+            return true;
         }
 
         /// <summary>
@@ -328,25 +366,41 @@ namespace CCTVVideoEditor.Services
 
         private async void MediaPlayer_MediaEnded(MediaPlayer sender, object args)
         {
-            // Notify playback ended
-            PlaybackEnded?.Invoke(this, _currentSegment);
+
+            // Use the dispatcher to ensure we're on the UI thread when raising events
+            _dispatcherQueue?.TryEnqueue(() =>
+            {
+                // Notify playback ended
+                PlaybackEnded?.Invoke(this, _currentSegment);
+            });
+
+            // If this was a manual selection, don't auto-advance
+            if (_isManualSelection)
+            {
+                Debug.WriteLine("Skipping auto-advancement for manual selection");
+                return;
+            }
 
             // If continuous playback is enabled, try to play the next segment
             if (_continuousPlayback && !_isTransitioning)
             {
                 _isTransitioning = true;
 
-                if (await MoveToNextSegmentAsync())
-                {
-                    // Next segment playing
-                }
-                else
-                {
-                    // No more segments
-                    PlaybackError?.Invoke(this, "End of timeline reached");
-                }
+                // Log for debugging
+                Debug.WriteLine($"Auto-advancing from segment: {_currentSegment?.StartTime:HH:mm:ss}");
 
-                _isTransitioning = false;
+                bool success = await MoveToNextSegmentAsync();
+
+                _dispatcherQueue?.TryEnqueue(() =>
+                {
+                    if (!success)
+                    {
+                        // No more segments
+                        PlaybackError?.Invoke(this, "End of timeline reached");
+                    }
+
+                    _isTransitioning = false;
+                });
             }
         }
 
