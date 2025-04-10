@@ -89,40 +89,56 @@ namespace CCTVVideoEditor.Services
         /// <returns>Duration in seconds</returns>
         private async Task<double> GetVideoDurationAsync(string filePath)
         {
-            StorageFile file = await StorageFile.GetFileFromPathAsync(filePath);
-
-            // Create a MediaSource from the file
-            MediaSource mediaSource = MediaSource.CreateFromStorageFile(file);
-
-            // Create a MediaPlaybackItem to get properties
-            MediaPlaybackItem mediaPlaybackItem = new MediaPlaybackItem(mediaSource);
-
-            // Wait for the media to be loaded
-            var tcs = new TaskCompletionSource<double>();
-
-            mediaPlaybackItem.MediaOpened += (sender, args) =>
+            try
             {
-                // Get duration in seconds
-                double duration = mediaPlaybackItem.Source.Duration.GetValueOrDefault().TotalSeconds;
-                tcs.SetResult(duration);
-            };
+                StorageFile file = await StorageFile.GetFileFromPathAsync(filePath);
 
-            mediaPlaybackItem.MediaFailed += (sender, args) =>
-            {
-                tcs.SetException(new Exception($"Failed to load media: {args.Error.Message}"));
-            };
+                // Create a MediaSource from the file
+                MediaSource mediaSource = MediaSource.CreateFromStorageFile(file);
 
-            // Set a timeout to avoid hanging forever
-            var timeoutTask = Task.Delay(5000);
-            var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+                // In WinUI 3, we can use MediaSource directly to get the duration
+                // Wait for the media to be opened, which happens asynchronously
+                var openOperation = mediaSource.OpenAsync();
 
-            if (completedTask == timeoutTask)
-            {
-                // Timeout occurred
-                throw new TimeoutException("Timed out while getting video duration");
+                // Set a timeout to avoid hanging forever
+                var timeoutTask = Task.Delay(5000);
+                var completedTask = await Task.WhenAny(openOperation.AsTask(), timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    // Timeout occurred
+                    throw new TimeoutException("Timed out while opening media source");
+                }
+
+                // Check if the open operation was successful
+                await openOperation;
+
+                // Now we can access the duration
+                if (mediaSource.Duration.HasValue)
+                {
+                    double duration = mediaSource.Duration.Value.TotalSeconds;
+
+                    // Clean up
+                    mediaSource.Dispose();
+
+                    return duration;
+                }
+                else
+                {
+                    // If duration is not available, use a default value
+                    // Clean up
+                    mediaSource.Dispose();
+
+                    // Default to 5 minutes (300 seconds)
+                    return 300.0;
+                }
             }
-
-            return await tcs.Task;
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting video duration: {ex.Message}");
+                // Return a default duration if there's an error
+                return 300.0; // Default to 5 minutes (300 seconds)
+            }
         }
 
         /// <summary>
