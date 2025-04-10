@@ -36,6 +36,9 @@ namespace CCTVVideoEditor.Views
 
             // Set data context for bindings
             this.DataContext = _viewModel;
+
+            // Set up unloaded event to clean up resources
+            this.Unloaded += Page_Unloaded;
         }
 
         /// <summary>

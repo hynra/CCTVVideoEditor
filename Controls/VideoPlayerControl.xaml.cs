@@ -187,6 +187,19 @@ namespace CCTVVideoEditor.Controls
             UpdateTimestampOverlay();
         }
 
+        /// <summary>
+        /// Sets the media player instance
+        /// </summary>
+        /// <param name="mediaPlayer">Media player to set</param>
+        public void SetMediaPlayer(Windows.Media.Playback.MediaPlayer mediaPlayer)
+        {
+            if (mediaPlayer != null)
+            {
+                _mediaPlayer = mediaPlayer;
+                MediaPlayer.SetMediaPlayer(_mediaPlayer);
+            }
+        }
+
         // Event handlers for the playback control buttons
         private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
         {

@@ -76,7 +76,7 @@ namespace CCTVVideoEditor.ViewModels
         public string StatusMessage
         {
             get => _statusMessage;
-            private set => SetProperty(ref _statusMessage, value);
+            set => SetProperty(ref _statusMessage, value);
         }
 
         /// <summary>
