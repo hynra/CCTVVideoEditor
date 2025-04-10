@@ -9,9 +9,6 @@ using Microsoft.UI.Dispatching;
 
 namespace CCTVVideoEditor.Services
 {
-    /// <summary>
-    /// Service for handling video playback across segments
-    /// </summary>
     public class PlaybackService
     {
         private readonly TimelineService _timelineService;
@@ -30,25 +27,14 @@ namespace CCTVVideoEditor.Services
         public event EventHandler<DateTime> PositionChanged;
         public event EventHandler<string> PlaybackError;
 
-        /// <summary>
-        /// Gets the media player
-        /// </summary>
         public MediaPlayer MediaPlayer => _mediaPlayer;
 
-        /// <summary>
-        /// Gets or sets whether playback should continue to next segment
-        /// </summary>
         public bool ContinuousPlayback
         {
             get => _continuousPlayback;
             set => _continuousPlayback = value;
         }
 
-        /// <summary>
-        /// Creates a new PlaybackService
-        /// </summary>
-        /// <param name="timelineService">Timeline service</param>
-        /// 
         private DispatcherQueue _dispatcherQueue;
         public bool _isManualSelection = false;
         private bool _disableAutoAdvancement = false;
@@ -82,11 +68,6 @@ namespace CCTVVideoEditor.Services
             _mediaPlayer.PlaybackSession.PositionChanged += PlaybackSession_PositionChanged;
         }
 
-        /// <summary>
-        /// Loads and plays a video segment
-        /// </summary>
-        /// <param name="segment">Segment to play</param>
-        /// <returns>Task</returns>
         public async Task PlaySegmentAsync(VideoSegment segment)
         {
             if (segment == null || !segment.IsAvailable)
@@ -131,9 +112,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Plays or pauses the current video
-        /// </summary>
         public void PlayPause()
         {
             if (_mediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
@@ -146,19 +124,12 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Stops playback and resets position
-        /// </summary>
         public void Stop()
         {
             _mediaPlayer.Pause();
             _mediaPlayer.PlaybackSession.Position = TimeSpan.Zero;
         }
 
-        /// <summary>
-        /// Seeks to a specific position in the current segment
-        /// </summary>
-        /// <param name="offsetSeconds">Offset in seconds from segment start</param>
         public void SeekToPosition(double offsetSeconds)
         {
             if (_currentSegment == null)
@@ -174,11 +145,6 @@ namespace CCTVVideoEditor.Services
             _timelineService.UpdatePositionWithinSegment(clampedOffset);
         }
 
-        /// <summary>
-        /// Seeks to a specific time in the timeline
-        /// </summary>
-        /// <param name="targetTime">Time to seek to</param>
-        /// <returns>True if successful</returns>
         public async Task<bool> SeekToTimeAsync(DateTime targetTime)
         {
             try
@@ -233,10 +199,6 @@ namespace CCTVVideoEditor.Services
             return true;
         }
 
-        /// <summary>
-        /// Moves to the next segment
-        /// </summary>
-        /// <returns>Task<bool> indicating success</returns>
         public async Task<bool> MoveToNextSegmentAsync()
         {
             if (_timelineService.MoveToNextSegment())
@@ -248,10 +210,6 @@ namespace CCTVVideoEditor.Services
             return false;
         }
 
-        /// <summary>
-        /// Moves to the previous segment
-        /// </summary>
-        /// <returns>Task<bool> indicating success</returns>
         public async Task<bool> MoveToPreviousSegmentAsync()
         {
             if (_timelineService.MoveToPreviousSegment())
@@ -263,9 +221,6 @@ namespace CCTVVideoEditor.Services
             return false;
         }
 
-        /// <summary>
-        /// Cleans up resources
-        /// </summary>
         public void Cleanup()
         {
             if (_mediaPlayer != null)
@@ -290,11 +245,6 @@ namespace CCTVVideoEditor.Services
 
         #region Private Methods
 
-        /// <summary>
-        /// Loads a media source for a segment
-        /// </summary>
-        /// <param name="segment">Segment to load</param>
-        /// <returns>Task</returns>
         private async Task LoadMediaSourceAsync(VideoSegment segment)
         {
             if (_isPreloadingNext && _nextSegment == segment && _nextMediaSource != null)
@@ -321,10 +271,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Preloads the next segment for seamless playback
-        /// </summary>
-        /// <returns>Task</returns>
         private async Task PreloadNextSegmentAsync()
         {
             if (_currentSegment == null || _isPreloadingNext)

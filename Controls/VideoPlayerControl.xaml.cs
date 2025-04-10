@@ -81,10 +81,6 @@ namespace CCTVVideoEditor.Controls
             };
         }
 
-        /// <summary>
-        /// Load and play a video segment
-        /// </summary>
-        /// <param name="segment">Video segment to play</param>
         public async Task LoadVideoAsync(VideoSegment segment)
         {
             if (segment == null || !segment.IsAvailable)
@@ -123,9 +119,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Update the timestamp overlay based on current playback position
-        /// </summary>
         private void UpdateTimestampOverlay()
         {
             if (_currentSegment == null || _mediaPlayer.PlaybackSession == null)
@@ -151,9 +144,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Play or pause the current video
-        /// </summary>
         public void PlayPause()
         {
             if (_mediaPlayer == null)
@@ -171,9 +161,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Stop playback
-        /// </summary>
         public void Stop()
         {
             if (_mediaPlayer == null)
@@ -187,10 +174,6 @@ namespace CCTVVideoEditor.Controls
             UpdateTimestampOverlay();
         }
 
-        /// <summary>
-        /// Sets the media player instance
-        /// </summary>
-        /// <param name="mediaPlayer">Media player to set</param>
         public void SetMediaPlayer(Windows.Media.Playback.MediaPlayer mediaPlayer)
         {
             if (mediaPlayer != null)
@@ -223,9 +206,6 @@ namespace CCTVVideoEditor.Controls
             RequestNextSegment?.Invoke(this, _currentSegment);
         }
 
-        /// <summary>
-        /// Clean up resources when control is unloaded
-        /// </summary>
         public void Cleanup()
         {
             _timestampTimer?.Stop();

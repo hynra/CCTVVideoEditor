@@ -7,9 +7,6 @@ using System.Threading.Tasks;
 
 namespace CCTVVideoEditor.Services
 {
-    /// <summary>
-    /// Service for managing timeline data and navigation
-    /// </summary>
     public class TimelineService
     {
         private TimelineData _timelineData;
@@ -20,25 +17,12 @@ namespace CCTVVideoEditor.Services
         public event EventHandler<VideoSegment> CurrentSegmentChanged;
         public event EventHandler<DateTime> CurrentPositionChanged;
 
-        /// <summary>
-        /// Gets the current timeline data
-        /// </summary>
         public TimelineData TimelineData => _timelineData;
 
-        /// <summary>
-        /// Gets the current video segment
-        /// </summary>
         public VideoSegment CurrentSegment => _currentSegment;
 
-        /// <summary>
-        /// Gets the current playback position
-        /// </summary>
         public DateTime CurrentPosition => _currentPosition;
 
-        /// <summary>
-        /// Initializes the timeline with data
-        /// </summary>
-        /// <param name="timelineData">Timeline data</param>
         public void Initialize(TimelineData timelineData)
         {
             _timelineData = timelineData;
@@ -61,11 +45,6 @@ namespace CCTVVideoEditor.Services
             CurrentSegmentChanged?.Invoke(this, _currentSegment);
         }
 
-        /// <summary>
-        /// Sets the current position in the timeline
-        /// </summary>
-        /// <param name="position">Position to set</param>
-        /// <returns>True if a segment was found at the position</returns>
         public bool SetPosition(DateTime position)
         {
             if (_timelineData == null)
@@ -107,10 +86,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Moves to the next segment
-        /// </summary>
-        /// <returns>True if successful, false if at end</returns>
         public bool MoveToNextSegment()
         {
             if (_timelineData == null || _currentSegment == null)
@@ -132,10 +107,6 @@ namespace CCTVVideoEditor.Services
             return false;
         }
 
-        /// <summary>
-        /// Moves to the previous segment
-        /// </summary>
-        /// <returns>True if successful, false if at start</returns>
         public bool MoveToPreviousSegment()
         {
             if (_timelineData == null || _currentSegment == null)
@@ -157,10 +128,6 @@ namespace CCTVVideoEditor.Services
             return false;
         }
 
-        /// <summary>
-        /// Updates the current position within the current segment
-        /// </summary>
-        /// <param name="offsetSeconds">Position offset in seconds from segment start</param>
         public void UpdatePositionWithinSegment(double offsetSeconds)
         {
             if (_currentSegment == null)
@@ -174,33 +141,16 @@ namespace CCTVVideoEditor.Services
             CurrentPositionChanged?.Invoke(this, _currentPosition);
         }
 
-        /// <summary>
-        /// Gets segments within a time range
-        /// </summary>
-        /// <param name="startTime">Start time</param>
-        /// <param name="endTime">End time</param>
-        /// <returns>List of segments</returns>
         public List<VideoSegment> GetSegmentsInRange(DateTime startTime, DateTime endTime)
         {
             return _timelineData?.GetSegmentsInRange(startTime, endTime) ?? new List<VideoSegment>();
         }
 
-        /// <summary>
-        /// Finds the segment that contains the specified time
-        /// </summary>
-        /// <param name="time">Time to find</param>
-        /// <returns>Segment if found, null otherwise</returns>
         public VideoSegment FindSegmentAtTime(DateTime time)
         {
             return _timelineData?.GetSegmentAtTime(time);
         }
 
-        /// <summary>
-        /// Gets the total duration of segments in a time range
-        /// </summary>
-        /// <param name="startTime">Start time</param>
-        /// <param name="endTime">End time</param>
-        /// <returns>Total duration in seconds</returns>
         public double GetTotalDurationInRange(DateTime startTime, DateTime endTime)
         {
             if (_timelineData == null)
@@ -225,12 +175,6 @@ namespace CCTVVideoEditor.Services
             return totalDuration;
         }
 
-        /// <summary>
-        /// Finds gaps in the timeline between start and end times
-        /// </summary>
-        /// <param name="startTime">Start time</param>
-        /// <param name="endTime">End time</param>
-        /// <returns>List of gaps</returns>
         public List<(DateTime start, DateTime end)> FindGapsInRange(DateTime startTime, DateTime endTime)
         {
             if (_timelineData == null)

@@ -10,16 +10,9 @@ using Windows.Storage;
 
 namespace CCTVVideoEditor.Services
 {
-    /// <summary>
-    /// Service to load and manage CCTV video files
-    /// </summary>
     public class VideoLoaderService
     {
-        /// <summary>
-        /// Load all video segments from the specified directory
-        /// </summary>
-        /// <param name="directoryPath">Path to directory containing CCTV videos</param>
-        /// <returns>TimelineData containing all valid video segments</returns>
+
         public async Task<TimelineData> LoadVideosFromDirectoryAsync(string directoryPath)
         {
             var segments = new List<VideoSegment>();
@@ -82,11 +75,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Gets the actual duration of a video file
-        /// </summary>
-        /// <param name="filePath">Path to the video file</param>
-        /// <returns>Duration in seconds</returns>
         private async Task<double> GetVideoDurationAsync(string filePath)
         {
             try
@@ -141,11 +129,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Check if a directory contains valid CCTV video files
-        /// </summary>
-        /// <param name="directoryPath">Directory to check</param>
-        /// <returns>True if valid videos are found</returns>
         public bool ContainsValidVideos(string directoryPath)
         {
             try
@@ -166,11 +149,6 @@ namespace CCTVVideoEditor.Services
             }
         }
 
-        /// <summary>
-        /// Counts the number of valid video files in a directory
-        /// </summary>
-        /// <param name="directoryPath">Directory to check</param>
-        /// <returns>Count of valid video files</returns>
         public int CountValidVideos(string directoryPath)
         {
             try

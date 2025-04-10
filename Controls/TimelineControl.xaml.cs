@@ -99,9 +99,6 @@ namespace CCTVVideoEditor.Controls
 
         #region Public Properties and Methods
 
-        /// <summary>
-        /// Gets or sets the timeline data
-        /// </summary>
         public TimelineData TimelineData
         {
             get => _timelineData;
@@ -131,9 +128,7 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Gets or sets the current segment
-        /// </summary>
+
         public VideoSegment CurrentSegment
         {
             get => _currentSegment;
@@ -154,21 +149,14 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Updates the current time position in the timeline
-        /// </summary>
-        /// <param name="time">The current time</param>
+
         public void UpdateCurrentTime(DateTime time)
         {
             _currentTime = time;
             UpdateCurrentPositionLine();
         }
 
-        /// <summary>
-        /// Sets the selection range
-        /// </summary>
-        /// <param name="startTime">Selection start time</param>
-        /// <param name="endTime">Selection end time</param>
+
         public void SetSelectionRange(DateTime startTime, DateTime endTime)
         {
             if (startTime < endTime)
@@ -185,9 +173,7 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Clears the current selection
-        /// </summary>
+
         public void ClearSelection()
         {
             _isSelectionActive = false;
@@ -198,19 +184,13 @@ namespace CCTVVideoEditor.Controls
             UpdateSelectionText();
         }
 
-        /// <summary>
-        /// Gets the selected time range
-        /// </summary>
-        /// <returns>Tuple of start and end times</returns>
+
         public (DateTime start, DateTime end) GetSelectionRange()
         {
             return (_selectionStartTime, _selectionEndTime);
         }
 
-        /// <summary>
-        /// Scrolls the timeline to make the specified time visible
-        /// </summary>
-        /// <param name="time">Time to show</param>
+
         public void EnsureTimeVisible(DateTime time)
         {
             if (time >= _viewStartTime && time <= _viewEndTime)
@@ -233,9 +213,6 @@ namespace CCTVVideoEditor.Controls
 
         #region Timeline Rendering
 
-        /// <summary>
-        /// Renders the complete timeline
-        /// </summary>
         private void RenderTimeline()
         {
             if (_timelineData == null)
@@ -281,9 +258,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Renders the mini navigator
-        /// </summary>
         private void RenderNavigator()
         {
             if (_timelineData == null || NavigatorCanvas == null)
@@ -325,9 +299,6 @@ namespace CCTVVideoEditor.Controls
             UpdateNavigatorViewFromScroll();
         }
 
-        /// <summary>
-        /// Updates the navigator view based on current scroll position
-        /// </summary>
         private void UpdateNavigatorViewFromScroll()
         {
             if (NavigatorCanvas == null || NavigatorView == null || TimelineScrollViewer == null)
@@ -350,9 +321,6 @@ namespace CCTVVideoEditor.Controls
             Canvas.SetLeft(NavigatorView, _navigatorViewPosition);
         }
 
-        /// <summary>
-        /// Renders time ticks and labels on the timeline
-        /// </summary>
         private void RenderTimeTicks()
         {
             // Start from the view start time rounded down to the nearest hour
@@ -443,9 +411,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Renders video segments on the timeline
-        /// </summary>
         private void RenderVideoSegments()
         {
             if (_timelineData == null)
@@ -483,9 +448,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Renders gaps in the timeline
-        /// </summary>
         private void RenderGaps()
         {
             if (_timelineData == null)
@@ -522,9 +484,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-        /// <summary>
-        /// Updates the current position line
-        /// </summary>
         private void UpdateCurrentPositionLine()
         {
             double position = TimeToPosition(_currentTime);
@@ -534,9 +493,6 @@ namespace CCTVVideoEditor.Controls
             CurrentPositionLine.X2 = position;
         }
 
-        /// <summary>
-        /// Updates the selection rectangle
-        /// </summary>
         private void UpdateSelectionRectangle()
         {
             if (!_isSelectionActive)
@@ -558,9 +514,6 @@ namespace CCTVVideoEditor.Controls
             SelectionCanvas.Children.Add(_selectionRectangle);
         }
 
-        /// <summary>
-        /// Updates the selection time text
-        /// </summary>
         private void UpdateSelectionText()
         {
             if (_isSelectionActive)
@@ -586,11 +539,6 @@ namespace CCTVVideoEditor.Controls
 
         #region Timeline Calculations
 
-        /// <summary>
-        /// Converts a time to a position on the timeline
-        /// </summary>
-        /// <param name="time">Time to convert</param>
-        /// <returns>Position in pixels</returns>
         private double TimeToPosition(DateTime time)
         {
             // Calculate seconds from view start
@@ -600,11 +548,6 @@ namespace CCTVVideoEditor.Controls
             return seconds * _pixelsPerSecond;
         }
 
-        /// <summary>
-        /// Converts a position to a time on the timeline
-        /// </summary>
-        /// <param name="position">Position in pixels</param>
-        /// <returns>Time at position</returns>
         private DateTime PositionToTime(double position)
         {
             // Calculate seconds from position
@@ -614,10 +557,6 @@ namespace CCTVVideoEditor.Controls
             return _viewStartTime.AddSeconds(seconds);
         }
 
-        /// <summary>
-        /// Updates the zoom level
-        /// </summary>
-        /// <param name="zoomLevel">Zoom level (1-24)</param>
         private void UpdateZoom(double zoomLevel)
         {
             // Calculate pixels per second based on zoom level

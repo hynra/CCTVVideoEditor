@@ -7,16 +7,11 @@ using System.Threading.Tasks;
 
 namespace CCTVVideoEditor.Views
 {
-    /// <summary>
-    /// Main page of the application with timeline support
-    /// </summary>
+
     public sealed partial class MainPage : Page
     {
         private MainViewModel _viewModel;
 
-        /// <summary>
-        /// Gets the view model
-        /// </summary>
         public MainViewModel ViewModel => _viewModel;
 
         public MainPage()
@@ -41,9 +36,6 @@ namespace CCTVVideoEditor.Views
             this.Unloaded += Page_Unloaded;
         }
 
-        /// <summary>
-        /// Handles click on the Open Folder button
-        /// </summary>
         private async void OpenFolderButton_Click(object sender, RoutedEventArgs e)
         {
             bool success = await _viewModel.LoadVideosFromFolderAsync();
@@ -56,9 +48,6 @@ namespace CCTVVideoEditor.Views
             }
         }
 
-        /// <summary>
-        /// Handles click on the Export button
-        /// </summary>
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
             // Export functionality will be implemented in Generation 3
@@ -86,33 +75,21 @@ namespace CCTVVideoEditor.Views
             _ = dialog.ShowAsync();
         }
 
-        /// <summary>
-        /// Handles time selection in timeline
-        /// </summary>
         private async void Timeline_TimeSelected(object sender, DateTime e)
         {
             await _viewModel.SeekToTimeAsync(e);
         }
 
-        /// <summary>
-        /// Handles segment selection in timeline
-        /// </summary>
         private async void Timeline_SegmentSelected(object sender, VideoSegment e)
         {
             await _viewModel.SeekToTimeAsync(e.StartTime);
         }
 
-        /// <summary>
-        /// Handles range selection in timeline
-        /// </summary>
         private void Timeline_RangeSelected(object sender, (DateTime start, DateTime end) e)
         {
             _viewModel.SetSelectionRange(e.start, e.end);
         }
 
-        /// <summary>
-        /// Page cleanup
-        /// </summary>
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             // Clean up resources
