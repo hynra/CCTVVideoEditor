@@ -31,13 +31,18 @@ namespace CCTVVideoEditor.Controls
         private Rectangle _selectionRectangle;
 
         // Timeline rendering parameters
-        private double _pixelsPerSecond = 2.0;
+        private double _pixelsPerSecond = 5.0; // Increased default for better visibility
         private const int HourTickHeight = 15;
         private const int HalfHourTickHeight = 10;
         private const int MinuteTickHeight = 5;
 
         // Timeline dimensions
         private double _timelineWidth;
+
+        // Interaction flags
+        private bool _isDragging = false;
+        private Point _dragStartPoint;
+        private double _dragStartOffset;
 
         // Event handlers
         public event EventHandler<DateTime> TimeSelected;
@@ -62,14 +67,46 @@ namespace CCTVVideoEditor.Controls
             _viewEndTime = DateTime.Today.AddHours(24);
             _currentTime = DateTime.Now;
 
-            // Set initial zoom level
-            UpdateZoom(ZoomSlider.Value);
-
             // Add pointer event handlers to the segments canvas
             SegmentsCanvas.PointerPressed += SegmentsCanvas_PointerPressed;
             SegmentsCanvas.PointerMoved += SegmentsCanvas_PointerMoved;
             SegmentsCanvas.PointerReleased += SegmentsCanvas_PointerReleased;
             SegmentsCanvas.PointerExited += SegmentsCanvas_PointerExited;
+
+            // Enable manipulation for horizontal scrolling
+            SegmentsCanvas.ManipulationMode = ManipulationModes.TranslateX;
+
+            // Add Loaded event handler
+            this.Loaded += TimelineControl_Loaded;
+
+            // Initialize time preset combo box
+            InitializeTimePresets();
+        }
+
+        private void TimelineControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Set initial zoom level after the control is fully loaded
+            UpdateZoom(ZoomSlider.Value);
+        }
+
+        private void InitializeTimePresets()
+        {
+            if (TimePresetComboBox != null)
+            {
+                // Already initialized
+                return;
+            }
+
+            // Initialize with default items if not set in XAML
+            if (TimePresetComboBox.Items.Count == 0)
+            {
+                TimePresetComboBox.Items.Add(new ComboBoxItem { Content = "View All Day" });
+                TimePresetComboBox.Items.Add(new ComboBoxItem { Content = "Morning (6-12)" });
+                TimePresetComboBox.Items.Add(new ComboBoxItem { Content = "Afternoon (12-18)" });
+                TimePresetComboBox.Items.Add(new ComboBoxItem { Content = "Evening (18-24)" });
+                TimePresetComboBox.Items.Add(new ComboBoxItem { Content = "Night (0-6)" });
+                TimePresetComboBox.SelectedIndex = 0;
+            }
         }
 
         #region Public Properties and Methods
@@ -188,7 +225,16 @@ namespace CCTVVideoEditor.Controls
             if (time >= _viewStartTime && time <= _viewEndTime)
             {
                 double position = TimeToPosition(time);
-                double scrollViewerWidth = TimelineScrollViewer.ViewportWidth;
+
+                // Check if TimelineScrollViewer is null before accessing its properties
+                if (TimelineScrollViewer == null)
+                    return;
+
+                double scrollViewerWidth = TimelineScrollViewer.ActualWidth;
+
+                // Use a default width if ActualWidth is not yet available
+                if (scrollViewerWidth <= 0)
+                    scrollViewerWidth = 800;
 
                 // Calculate scroll position to center the time
                 double scrollPosition = Math.Max(0, position - (scrollViewerWidth / 2));
@@ -196,6 +242,39 @@ namespace CCTVVideoEditor.Controls
                 // Set horizontal scroll offset
                 TimelineScrollViewer.ChangeView(scrollPosition, null, null);
             }
+        }
+
+        /// <summary>
+        /// Sets the view to a specific time range
+        /// </summary>
+        /// <param name="startHour">Start hour (0-23)</param>
+        /// <param name="endHour">End hour (0-23)</param>
+        public void SetViewTimeRange(int startHour, int endHour)
+        {
+            if (_timelineData == null)
+                return;
+
+            DateTime date = _timelineData.Date;
+
+            // Create start and end times
+            DateTime startTime = new DateTime(date.Year, date.Month, date.Day, startHour, 0, 0);
+            DateTime endTime = new DateTime(date.Year, date.Month, date.Day, endHour, 0, 0);
+
+            // If end time is earlier than start time, assume it's the next day
+            if (endHour <= startHour)
+            {
+                endTime = endTime.AddDays(1);
+            }
+
+            // Calculate appropriate zoom level
+            double hoursInView = (endTime - startTime).TotalHours;
+            double zoomLevel = 24 / hoursInView;
+
+            // Update zoom slider
+            ZoomSlider.Value = Math.Min(Math.Max(zoomLevel, ZoomSlider.Minimum), ZoomSlider.Maximum);
+
+            // Ensure the time is visible
+            EnsureTimeVisible(startTime);
         }
 
         #endregion
@@ -517,8 +596,14 @@ namespace CCTVVideoEditor.Controls
             // Calculate pixels per second based on zoom level
             // At zoom level 1, we show 24 hours in the available width
             // At zoom level 24, we show 1 hour in the available width
-            double viewportWidth = TimelineScrollViewer.ViewportWidth > 0 ?
-                TimelineScrollViewer.ViewportWidth : 800; // Default width if not yet measured
+            double viewportWidth = 800; // Default width
+
+            // Check if TimelineScrollViewer is available
+            if (TimelineScrollViewer != null)
+            {
+                viewportWidth = TimelineScrollViewer.ActualWidth > 0 ?
+                    TimelineScrollViewer.ActualWidth : 800;
+            }
 
             // Hours to display in viewport
             double hoursInView = 24 / zoomLevel;
@@ -528,9 +613,34 @@ namespace CCTVVideoEditor.Controls
 
             // Re-render timeline
             RenderTimeline();
+
+            // Ensure current time is visible
+            EnsureTimeVisible(_currentTime);
         }
 
-        #endregion
+        /// <summary>
+        /// Moves the timeline view by the specified number of hours
+        /// </summary>
+        /// <param name="hours">Hours to move (positive for forward, negative for backward)</param>
+        private void MoveTimelineView(int hours)
+        {
+            if (_timelineData == null)
+                return;
+
+            // Calculate the new time to center on
+            DateTime centerTime = _currentTime.AddHours(hours);
+
+            // Ensure it's within the day
+            if (centerTime < _timelineData.Date)
+                centerTime = _timelineData.Date;
+            else if (centerTime > _timelineData.Date.AddDays(1))
+                centerTime = _timelineData.Date.AddDays(1).AddSeconds(-1);
+
+            // Update current time and ensure it's visible
+            _currentTime = centerTime;
+            UpdateCurrentPositionLine();
+            EnsureTimeVisible(centerTime);
+        }
 
         #region Event Handlers
 
@@ -575,13 +685,89 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
+        // New navigation event handlers
+        private void GoBackHour_Click(object sender, RoutedEventArgs e)
+        {
+            MoveTimelineView(-1);
+        }
+
+        private void GoForwardHour_Click(object sender, RoutedEventArgs e)
+        {
+            MoveTimelineView(1);
+        }
+
+        private void TimeJump_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is string timeText)
+            {
+                // Parse the time from the button's tag
+                if (TimeSpan.TryParse(timeText, out TimeSpan timeSpan))
+                {
+                    // Create a datetime for today with the specified time
+                    DateTime jumpTime = _timelineData.Date.Add(timeSpan);
+
+                    // Update current time
+                    _currentTime = jumpTime;
+                    UpdateCurrentPositionLine();
+
+                    // Ensure the time is visible
+                    EnsureTimeVisible(jumpTime);
+                }
+            }
+        }
+
+        private void TimePresetComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (TimePresetComboBox.SelectedIndex < 0 || _timelineData == null)
+                return;
+
+            switch (TimePresetComboBox.SelectedIndex)
+            {
+                case 0: // All Day
+                    SetViewTimeRange(0, 24);
+                    break;
+                case 1: // Morning (6-12)
+                    SetViewTimeRange(6, 12);
+                    break;
+                case 2: // Afternoon (12-18)
+                    SetViewTimeRange(12, 18);
+                    break;
+                case 3: // Evening (18-24)
+                    SetViewTimeRange(18, 24);
+                    break;
+                case 4: // Night (0-6)
+                    SetViewTimeRange(0, 6);
+                    break;
+            }
+        }
+
+        private void TimelineCanvas_ManipulationDelta(object sender, ManipulationDeltaRoutedEventArgs e)
+        {
+            // Handle direct manipulation (touch/pen) on the timeline
+            if (TimelineScrollViewer != null)
+            {
+                // Calculate new horizontal offset
+                double newOffset = TimelineScrollViewer.HorizontalOffset - e.Delta.Translation.X;
+
+                // Apply the new offset
+                TimelineScrollViewer.ChangeView(newOffset, null, null);
+
+                // Mark the event as handled to prevent it from bubbling up
+                e.Handled = true;
+            }
+        }
+
         private void TimelineScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
         {
+            // Make sure TimelineScrollViewer is not null
+            if (TimelineScrollViewer == null)
+                return;
+
             // If we're dragging the scrollbar, update view bounds
             if (!e.IsIntermediate)
             {
                 double scrollPosition = TimelineScrollViewer.HorizontalOffset;
-                double viewportWidth = TimelineScrollViewer.ViewportWidth;
+                double viewportWidth = TimelineScrollViewer.ActualWidth;
 
                 // Calculate visible time range
                 DateTime visibleStart = PositionToTime(scrollPosition);
@@ -594,9 +780,23 @@ namespace CCTVVideoEditor.Controls
 
         private void SegmentsCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            // Start selection
             Point point = e.GetCurrentPoint(SegmentsCanvas).Position;
 
+            // Check for right-click (used for scrolling/dragging the timeline)
+            var properties = e.GetCurrentPoint(SegmentsCanvas).Properties;
+
+            if (properties.IsRightButtonPressed)
+            {
+                // Start timeline dragging
+                _isDragging = true;
+                _dragStartPoint = point;
+                _dragStartOffset = TimelineScrollViewer.HorizontalOffset;
+                SegmentsCanvas.CapturePointer(e.Pointer);
+                e.Handled = true;
+                return;
+            }
+
+            // Otherwise, handle as selection
             // Convert position to time
             DateTime clickTime = PositionToTime(point.X);
 
@@ -636,12 +836,45 @@ namespace CCTVVideoEditor.Controls
 
         private void SegmentsCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            // Only update if selection is active and pointer is captured
-            if (_isSelectionActive && SegmentsCanvas.PointerCaptures?.Any(c => c.PointerId == e.Pointer.PointerId) == true)
-            {
-                // Get current position
-                Point point = e.GetCurrentPoint(SegmentsCanvas).Position;
+            // Make sure pointer is captured
+            if (!SegmentsCanvas.PointerCaptures?.Any(c => c.PointerId == e.Pointer.PointerId) == true)
+                return;
 
+            Point point = e.GetCurrentPoint(SegmentsCanvas).Position;
+
+            // Check if we're dragging the timeline
+            if (_isDragging)
+            {
+                // Calculate drag distance
+                double dragDeltaX = point.X - _dragStartPoint.X;
+
+                // Make sure TimelineScrollViewer is not null
+                if (TimelineScrollViewer == null)
+                    return;
+
+                // Calculate new scroll position
+                double newOffset = _dragStartOffset - dragDeltaX;
+
+                // Ensure offset is within bounds
+                newOffset = Math.Max(0, newOffset);
+
+                // Only use ViewportWidth if it's valid
+                double maxOffset = TimelineContainer.Width;
+                if (TimelineScrollViewer.ViewportWidth > 0)
+                    maxOffset -= TimelineScrollViewer.ViewportWidth;
+
+                newOffset = Math.Min(maxOffset, newOffset);
+
+                // Update scroll position
+                TimelineScrollViewer.ChangeView(newOffset, null, null);
+
+                e.Handled = true;
+                return;
+            }
+
+            // Otherwise handle selection
+            if (_isSelectionActive)
+            {
                 // Convert position to time
                 DateTime moveTime = PositionToTime(point.X);
 
@@ -664,6 +897,15 @@ namespace CCTVVideoEditor.Controls
 
         private void SegmentsCanvas_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
+            // Check if we were dragging the timeline
+            if (_isDragging)
+            {
+                _isDragging = false;
+                SegmentsCanvas.ReleasePointerCapture(e.Pointer);
+                e.Handled = true;
+                return;
+            }
+
             // End selection
             if (_isSelectionActive)
             {
@@ -707,6 +949,13 @@ namespace CCTVVideoEditor.Controls
 
         private void SegmentsCanvas_PointerExited(object sender, PointerRoutedEventArgs e)
         {
+            // If leaving canvas while dragging, continue the drag
+            if (_isDragging && SegmentsCanvas.PointerCaptures?.Any(c => c.PointerId == e.Pointer.PointerId) == true)
+            {
+                // Keep dragging, don't release
+                return;
+            }
+
             // If we leave the canvas while selecting, finish selection
             if (_isSelectionActive && SegmentsCanvas.PointerCaptures?.Any(c => c.PointerId == e.Pointer.PointerId) == true)
             {
@@ -744,4 +993,5 @@ namespace CCTVVideoEditor.Controls
 
         #endregion
     }
+    #endregion // End of Event Handlers Region
 }
