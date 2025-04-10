@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace CCTVVideoEditor.Views
 {
-
     public sealed partial class MainPage : Page
     {
         private MainViewModel _viewModel;
+
+        // Track if we're currently seeking to avoid feedback loops
+        private bool _isSeeking = false;
 
         public MainViewModel ViewModel => _viewModel;
 
@@ -77,12 +79,55 @@ namespace CCTVVideoEditor.Views
 
         private async void Timeline_TimeSelected(object sender, DateTime e)
         {
-            await _viewModel.SeekToTimeAsync(e);
+            // Check if we're already seeking to avoid feedback loops
+            if (!_isSeeking)
+            {
+                try
+                {
+                    _isSeeking = true;
+
+                    // Seek to the selected time
+                    await _viewModel.SeekToTimeAsync(e);
+
+                    // If there's a segment at this time, update the timeline's current segment
+                    var segment = _viewModel.TimelineData?.GetSegmentAtTime(e);
+                    if (segment != null)
+                    {
+                        Timeline.UpdateCurrentTime(e);
+                    }
+                    else
+                    {
+                        // No segment at this time - still update the timeline position
+                        Timeline.UpdateCurrentTime(e);
+
+                        // Set status message to indicate no footage
+                        _viewModel.StatusMessage = $"No video footage at {e:HH:mm:ss}";
+                    }
+                }
+                finally
+                {
+                    _isSeeking = false;
+                }
+            }
         }
 
         private async void Timeline_SegmentSelected(object sender, VideoSegment e)
         {
-            await _viewModel.SeekToTimeAsync(e.StartTime);
+            // Check if we're already seeking to avoid feedback loops
+            if (!_isSeeking)
+            {
+                try
+                {
+                    _isSeeking = true;
+
+                    // Seek to the segment start time
+                    await _viewModel.SeekToTimeAsync(e.StartTime);
+                }
+                finally
+                {
+                    _isSeeking = false;
+                }
+            }
         }
 
         private void Timeline_RangeSelected(object sender, (DateTime start, DateTime end) e)

@@ -54,6 +54,10 @@ namespace CCTVVideoEditor.Controls
         private Point _dragStartPoint;
         private double _dragStartOffset;
 
+        // Position handle drag state
+        private bool _isPositionHandleDragging = false;
+        private double _handleDragStartX;
+
         #endregion
 
         public TimelineControl()
@@ -128,7 +132,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-
         public VideoSegment CurrentSegment
         {
             get => _currentSegment;
@@ -149,13 +152,11 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-
         public void UpdateCurrentTime(DateTime time)
         {
             _currentTime = time;
             UpdateCurrentPositionLine();
         }
-
 
         public void SetSelectionRange(DateTime startTime, DateTime endTime)
         {
@@ -173,7 +174,6 @@ namespace CCTVVideoEditor.Controls
             }
         }
 
-
         public void ClearSelection()
         {
             _isSelectionActive = false;
@@ -184,12 +184,10 @@ namespace CCTVVideoEditor.Controls
             UpdateSelectionText();
         }
 
-
         public (DateTime start, DateTime end) GetSelectionRange()
         {
             return (_selectionStartTime, _selectionEndTime);
         }
-
 
         public void EnsureTimeVisible(DateTime time)
         {
@@ -491,6 +489,10 @@ namespace CCTVVideoEditor.Controls
             // Update line position
             CurrentPositionLine.X1 = position;
             CurrentPositionLine.X2 = position;
+
+            // Update position handle location
+            Canvas.SetLeft(PositionHandle, position - (PositionHandle.Width / 2));
+            Canvas.SetTop(PositionHandle, 0); // Place at the top
         }
 
         private void UpdateSelectionRectangle()
@@ -581,6 +583,95 @@ namespace CCTVVideoEditor.Controls
 
             // Re-render timeline
             RenderTimeline();
+        }
+
+        #endregion
+
+        #region Position Handle Interaction
+
+        private void PositionHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            // Start position handle dragging
+            _isPositionHandleDragging = true;
+            _handleDragStartX = e.GetCurrentPoint(TimelineContainer).Position.X;
+
+            // Capture pointer for dragging
+            PositionHandle.CapturePointer(e.Pointer);
+
+            e.Handled = true;
+        }
+
+        private void PositionHandle_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (_isPositionHandleDragging)
+            {
+                // Get current position
+                Point point = e.GetCurrentPoint(TimelineContainer).Position;
+
+                // Calculate new position 
+                double newPosition = Math.Max(0, Math.Min(point.X, _timelineWidth));
+
+                // Convert position to time
+                DateTime newTime = PositionToTime(newPosition);
+
+                // Update the internal current time
+                _currentTime = newTime;
+
+                // Update UI
+                UpdateCurrentPositionLine();
+
+                // Notify time selected - will be used to update video playback
+                TimeSelected?.Invoke(this, newTime);
+
+                e.Handled = true;
+            }
+        }
+
+        private void PositionHandle_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (_isPositionHandleDragging)
+            {
+                // End dragging
+                _isPositionHandleDragging = false;
+                PositionHandle.ReleasePointerCapture(e.Pointer);
+
+                // Get final position
+                Point point = e.GetCurrentPoint(TimelineContainer).Position;
+
+                // Calculate new position (clamped to timeline width)
+                double newPosition = Math.Max(0, Math.Min(point.X, _timelineWidth));
+
+                // Convert position to time
+                DateTime newTime = PositionToTime(newPosition);
+
+                // Update current time
+                _currentTime = newTime;
+
+                // Update UI
+                UpdateCurrentPositionLine();
+
+                // Find segment at this position
+                var segment = _timelineData?.GetSegmentAtTime(newTime);
+
+                if (segment != null)
+                {
+                    // Notify segment selected
+                    SegmentSelected?.Invoke(this, segment);
+                }
+                else
+                {
+                    // Just notify time selected
+                    TimeSelected?.Invoke(this, newTime);
+                }
+
+                e.Handled = true;
+            }
+        }
+
+        private void PositionHandle_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            // Reset dragging state
+            _isPositionHandleDragging = false;
         }
 
         #endregion
@@ -911,31 +1002,31 @@ namespace CCTVVideoEditor.Controls
                 return;
             // Calculate the new position
             double navigatorWidth = NavigatorCanvas.ActualWidth;
-                if (navigatorWidth <= 0)
-                    navigatorWidth = this.ActualWidth;
+            if (navigatorWidth <= 0)
+                navigatorWidth = this.ActualWidth;
 
-                double currentX = e.GetCurrentPoint(NavigatorCanvas).Position.X;
-                double newPosition = _navigatorViewPosition + (currentX - _navigatorDragStartX);
+            double currentX = e.GetCurrentPoint(NavigatorCanvas).Position.X;
+            double newPosition = _navigatorViewPosition + (currentX - _navigatorDragStartX);
 
-                // Ensure it stays within bounds
-                newPosition = Math.Max(0, Math.Min(newPosition, navigatorWidth - _navigatorViewWidth));
+            // Ensure it stays within bounds
+            newPosition = Math.Max(0, Math.Min(newPosition, navigatorWidth - _navigatorViewWidth));
 
-                // Update the visual position
-                Canvas.SetLeft(NavigatorView, newPosition);
+            // Update the visual position
+            Canvas.SetLeft(NavigatorView, newPosition);
 
-                // Calculate the corresponding scroll position
-                double scrollPercentage = newPosition / navigatorWidth;
-                double newScrollPosition = scrollPercentage * _timelineWidth;
+            // Calculate the corresponding scroll position
+            double scrollPercentage = newPosition / navigatorWidth;
+            double newScrollPosition = scrollPercentage * _timelineWidth;
 
-                // Apply the scroll
-                TimelineScrollViewer.ChangeView(newScrollPosition, null, null);
+            // Apply the scroll
+            TimelineScrollViewer.ChangeView(newScrollPosition, null, null);
 
-                // Update drag start for the next move
-                _navigatorDragStartX = currentX;
-                _navigatorViewPosition = newPosition;
+            // Update drag start for the next move
+            _navigatorDragStartX = currentX;
+            _navigatorViewPosition = newPosition;
 
-                e.Handled = true;
-            
+            e.Handled = true;
+
         }
 
         private void NavigatorView_PointerReleased(object sender, PointerRoutedEventArgs e)

@@ -48,6 +48,15 @@
             <Setter Property="Y1" Value="0"/>
             <Setter Property="Y2" Value="50"/>
         </Style>
+        <Style x:Key="TimelinePositionHandleStyle" TargetType="Ellipse">
+            <Setter Property="Fill" Value="Red"/>
+            <Setter Property="Stroke" Value="White"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Height" Value="12"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -71,14 +80,13 @@
         </StackPanel>
 
         <!-- Timeline Container -->
-        <!-- Timeline Container -->
         <ScrollViewer Grid.Row="1" x:Name="TimelineScrollViewer" 
-              HorizontalScrollBarVisibility="Visible"
-              VerticalScrollBarVisibility="Disabled"
-              HorizontalScrollMode="Enabled"
-              VerticalScrollMode="Disabled"
-              Height="70" 
-              ViewChanged="TimelineScrollViewer_ViewChanged">
+      HorizontalScrollBarVisibility="Visible"
+      VerticalScrollBarVisibility="Disabled"
+      HorizontalScrollMode="Enabled"
+      VerticalScrollMode="Disabled"
+      Height="70" 
+      ViewChanged="TimelineScrollViewer_ViewChanged">
             <Grid x:Name="TimelineContainer" MinHeight="70" Background="Transparent">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="25"/>
@@ -98,8 +106,21 @@
                 <!-- Canvas for selection and current position -->
                 <Canvas x:Name="SelectionCanvas" Grid.Row="2" HorizontalAlignment="Left"/>
 
-                <!-- Current position marker -->
-                <Line x:Name="CurrentPositionLine" Style="{StaticResource TimelinePositionStyle}" Grid.RowSpan="3"/>
+                <!-- Current position indicator container -->
+                <Grid x:Name="PositionIndicatorContainer" Grid.RowSpan="3">
+                    <!-- Current position line -->
+                    <Line x:Name="CurrentPositionLine" Style="{StaticResource TimelinePositionStyle}"/>
+
+                    <!-- Position handle (draggable circle) -->
+                    <Ellipse x:Name="PositionHandle" 
+                     Style="{StaticResource TimelinePositionHandleStyle}" 
+                     Canvas.ZIndex="100"
+                     PointerPressed="PositionHandle_PointerPressed"
+                     PointerMoved="PositionHandle_PointerMoved"
+                     PointerReleased="PositionHandle_PointerReleased"
+                     PointerCaptureLost="PositionHandle_PointerCaptureLost"
+                     ManipulationMode="TranslateX"/>
+                </Grid>
             </Grid>
         </ScrollViewer>
 
