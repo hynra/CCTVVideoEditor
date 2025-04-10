@@ -14,13 +14,14 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Top Control Bar -->
         <CommandBar Grid.Row="0" Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}">
             <AppBarButton Icon="Folder" Label="Open Folder" Click="OpenFolderButton_Click" />
             <AppBarSeparator />
-            <AppBarButton Icon="Save" Label="Export Video" Click="ExportButton_Click" IsEnabled="False" x:Name="ExportButton" />
+            <AppBarButton Icon="Save" Label="Export Video" Click="ExportButton_Click" IsEnabled="{x:Bind ViewModel.IsSelectionActive, Mode=OneWay}" x:Name="ExportButton" />
 
             <CommandBar.Content>
                 <TextBlock Text="CCTV Video Editor" Margin="12,14" Style="{StaticResource TitleTextBlockStyle}"/>
@@ -38,14 +39,15 @@
                                        Grid.Column="0" 
                                        Margin="10,10,10,10"
                                        HorizontalAlignment="Stretch"
-                                       VerticalAlignment="Stretch"/>
+                                       VerticalAlignment="Stretch"
+                                       Visibility="{x:Bind ViewModel.IsVideoLoaded, Mode=OneWay}"/>
 
             <!-- Empty State - Shown when no videos are loaded -->
             <StackPanel x:Name="EmptyStatePanel" 
                       Grid.Column="0"
                       VerticalAlignment="Center" 
                       HorizontalAlignment="Center"
-                      Visibility="Visible">
+                      Visibility="{x:Bind ViewModel.IsEmptyStateVisible, Mode=OneWay}">
                 <FontIcon Glyph="&#xE714;" 
                         FontSize="72" 
                         HorizontalAlignment="Center" 
@@ -60,10 +62,30 @@
                          TextWrapping="WrapWholeWords"
                          MaxWidth="400"/>
             </StackPanel>
+
+            <!-- Loading Indicator -->
+            <Grid x:Name="LoadingOverlay"
+                 Background="{ThemeResource SystemControlBackgroundBaseMediumBrush}"
+                 Opacity="0.7"
+                 Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <ProgressRing IsActive="True" Width="50" Height="50" Margin="0,0,0,10"/>
+                    <TextBlock Text="{x:Bind ViewModel.LoadingMessage, Mode=OneWay}" 
+                             Style="{StaticResource BodyTextBlockStyle}" 
+                             HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
         </Grid>
 
+        <!-- Timeline Control -->
+        <controls:TimelineControl x:Name="Timeline" 
+                                Grid.Row="2" 
+                                Margin="10,0,10,10"
+                                Height="100" 
+                                Visibility="{x:Bind ViewModel.IsVideoLoaded, Mode=OneWay}"/>
+
         <!-- Footer Status Bar -->
-        <Grid Grid.Row="2" Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}">
+        <Grid Grid.Row="3" Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}" Height="32">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -72,24 +94,21 @@
 
             <TextBlock x:Name="StatusTextBlock" 
                      Grid.Column="0"
-                     Text="Ready" 
+                     Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" 
                      Margin="12,8" 
                      VerticalAlignment="Center" />
 
-            <!-- Placeholder for timeline (Generation 2) -->
-            <Border Grid.Column="1" 
-                  Background="{ThemeResource SystemControlBackgroundBaseLowBrush}" 
-                  Margin="4"
-                  Padding="8,4"
-                  CornerRadius="4">
-                <TextBlock Text="Timeline will appear here in Generation 2" 
-                         HorizontalAlignment="Center"
-                         FontStyle="Italic"/>
-            </Border>
+            <StackPanel Grid.Column="1" 
+                      Orientation="Horizontal" 
+                      HorizontalAlignment="Center" 
+                      VerticalAlignment="Center">
+                <TextBlock Text="Current: " VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBlock Text="{x:Bind ViewModel.CurrentTimeText, Mode=OneWay}" VerticalAlignment="Center"/>
+            </StackPanel>
 
             <TextBlock x:Name="VideoInfoTextBlock" 
                      Grid.Column="2"
-                     Text="No video loaded" 
+                     Text="{x:Bind ViewModel.CurrentSegmentInfo, Mode=OneWay}" 
                      Margin="12,8" 
                      VerticalAlignment="Center" />
         </Grid>

@@ -1,34 +1,41 @@
 ﻿using CCTVVideoEditor.Models;
-using CCTVVideoEditor.Services;
+using CCTVVideoEditor.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Threading.Tasks;
-using Windows.Storage;
-using Windows.Storage.Pickers;
 
 namespace CCTVVideoEditor.Views
 {
     /// <summary>
-    /// Main page of the application
+    /// Main page of the application with timeline support
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private VideoLoaderService _videoLoaderService;
-        private TimelineData _timelineData;
-        private VideoSegment _currentSegment;
+        private MainViewModel _viewModel;
+
+        /// <summary>
+        /// Gets the view model
+        /// </summary>
+        public MainViewModel ViewModel => _viewModel;
 
         public MainPage()
         {
+            // Create view model
+            _viewModel = new MainViewModel();
+
             this.InitializeComponent();
 
-            // Initialize services
-            _videoLoaderService = new VideoLoaderService();
+            // Connect video player to media player from view model
+            VideoPlayer.SetMediaPlayer(_viewModel.MediaPlayer);
 
-            // Set up event handlers
-            VideoPlayer.RequestNextSegment += VideoPlayer_RequestNextSegment;
-            VideoPlayer.RequestPreviousSegment += VideoPlayer_RequestPreviousSegment;
-            VideoPlayer.PlaybackEnded += VideoPlayer_PlaybackEnded;
+            // Set up timeline events
+            Timeline.TimeSelected += Timeline_TimeSelected;
+            Timeline.SegmentSelected += Timeline_SegmentSelected;
+            Timeline.RangeSelected += Timeline_RangeSelected;
+
+            // Set data context for bindings
+            this.DataContext = _viewModel;
         }
 
         /// <summary>
@@ -36,7 +43,14 @@ namespace CCTVVideoEditor.Views
         /// </summary>
         private async void OpenFolderButton_Click(object sender, RoutedEventArgs e)
         {
-            await LoadVideosFromFolderAsync();
+            bool success = await _viewModel.LoadVideosFromFolderAsync();
+
+            if (success)
+            {
+                // Update timeline with data
+                Timeline.TimelineData = _viewModel.TimelineData;
+                Timeline.CurrentSegment = _viewModel.CurrentSegment;
+            }
         }
 
         /// <summary>
@@ -45,172 +59,61 @@ namespace CCTVVideoEditor.Views
         private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
             // Export functionality will be implemented in Generation 3
-            ShowStatus("Export functionality will be available in Generation 3");
+            _viewModel.StatusMessage = "Export functionality will be available in Generation 3";
+
+            // Show selection details in status
+            var (start, end) = _viewModel.GetSelectionRange();
+            int segmentCount = _viewModel.GetSegmentsInSelectionRange().Count;
+            double duration = _viewModel.GetTotalDurationInSelection();
+            bool hasGaps = _viewModel.HasGapsInSelection();
+
+            ContentDialog dialog = new ContentDialog
+            {
+                Title = "Export Preview",
+                Content = $"Time Range: {start:HH:mm:ss} - {end:HH:mm:ss}\n" +
+                          $"Video segments: {segmentCount}\n" +
+                          $"Total duration: {TimeSpan.FromSeconds(duration):hh\\:mm\\:ss}\n" +
+                          $"Contains gaps: {(hasGaps ? "Yes" : "No")}",
+                PrimaryButtonText = "OK",
+                DefaultButton = ContentDialogButton.Primary
+            };
+
+            // Show dialog
+            dialog.XamlRoot = this.XamlRoot;
+            _ = dialog.ShowAsync();
         }
 
         /// <summary>
-        /// Load videos from a user-selected folder
+        /// Handles time selection in timeline
         /// </summary>
-        private async Task LoadVideosFromFolderAsync()
+        private async void Timeline_TimeSelected(object sender, DateTime e)
         {
-            try
-            {
-                // Show folder picker
-                FolderPicker folderPicker = new FolderPicker();
-                folderPicker.SuggestedStartLocation = PickerLocationId.VideosLibrary;
-                folderPicker.FileTypeFilter.Add("*");
-
-                // WinUI 3 requires setting the window handle for pickers
-                var window = new Window();
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-                WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, hwnd);
-
-                StorageFolder folder = await folderPicker.PickSingleFolderAsync();
-
-                if (folder != null)
-                {
-                    // Show loading status
-                    ShowStatus("Loading videos...");
-
-                    // Load videos from the selected folder
-                    _timelineData = await _videoLoaderService.LoadVideosFromDirectoryAsync(folder.Path);
-
-                    // Check if any videos were found
-                    if (_timelineData.SegmentCount > 0)
-                    {
-                        // Get first segment
-                        var firstSegment = _timelineData.GetAllSegments()[0];
-
-                        // Load the first video
-                        await LoadVideoSegmentAsync(firstSegment);
-
-                        // Enable export button
-                        ExportButton.IsEnabled = true;
-
-                        // Show success status
-                        ShowStatus($"Loaded {_timelineData.SegmentCount} videos");
-                    }
-                    else
-                    {
-                        // No videos found
-                        ShowStatus("No valid CCTV videos found in the selected folder");
-
-                        // Show empty state
-                        EmptyStatePanel.Visibility = Visibility.Visible;
-                        VideoPlayer.Visibility = Visibility.Collapsed;
-
-                        // Disable export button
-                        ExportButton.IsEnabled = false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Show error status
-                ShowStatus($"Error: {ex.Message}");
-            }
+            await _viewModel.SeekToTimeAsync(e);
         }
 
         /// <summary>
-        /// Load and play a video segment
+        /// Handles segment selection in timeline
         /// </summary>
-        private async Task LoadVideoSegmentAsync(VideoSegment segment)
+        private async void Timeline_SegmentSelected(object sender, VideoSegment e)
         {
-            if (segment == null || !segment.IsAvailable)
-                return;
-
-            try
-            {
-                // Store current segment
-                _currentSegment = segment;
-
-                // Hide empty state and show video player
-                EmptyStatePanel.Visibility = Visibility.Collapsed;
-                VideoPlayer.Visibility = Visibility.Visible;
-
-                // Load the video
-                await VideoPlayer.LoadVideoAsync(segment);
-
-                // Update video info text
-                VideoInfoTextBlock.Text = segment.GetDisplayName();
-            }
-            catch (Exception ex)
-            {
-                ShowStatus($"Error loading video: {ex.Message}");
-            }
+            await _viewModel.SeekToTimeAsync(e.StartTime);
         }
 
         /// <summary>
-        /// Shows a status message in the status bar
+        /// Handles range selection in timeline
         /// </summary>
-        private void ShowStatus(string message)
+        private void Timeline_RangeSelected(object sender, (DateTime start, DateTime end) e)
         {
-            StatusTextBlock.Text = message;
-        }
-
-        #region Event Handlers
-
-        /// <summary>
-        /// Handles request to play the next video segment
-        /// </summary>
-        private async void VideoPlayer_RequestNextSegment(object sender, VideoSegment e)
-        {
-            if (_timelineData == null || _currentSegment == null)
-                return;
-
-            var nextSegment = _timelineData.GetNextSegment(_currentSegment);
-
-            if (nextSegment != null)
-            {
-                await LoadVideoSegmentAsync(nextSegment);
-            }
-            else
-            {
-                ShowStatus("This is the last video segment");
-            }
+            _viewModel.SetSelectionRange(e.start, e.end);
         }
 
         /// <summary>
-        /// Handles request to play the previous video segment
+        /// Page cleanup
         /// </summary>
-        private async void VideoPlayer_RequestPreviousSegment(object sender, VideoSegment e)
+        private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (_timelineData == null || _currentSegment == null)
-                return;
-
-            var prevSegment = _timelineData.GetPreviousSegment(_currentSegment);
-
-            if (prevSegment != null)
-            {
-                await LoadVideoSegmentAsync(prevSegment);
-            }
-            else
-            {
-                ShowStatus("This is the first video segment");
-            }
+            // Clean up resources
+            _viewModel.Cleanup();
         }
-
-        /// <summary>
-        /// Handles playback ended event
-        /// </summary>
-        private async void VideoPlayer_PlaybackEnded(object sender, EventArgs e)
-        {
-            // Automatically play the next segment if available
-            if (_timelineData != null && _currentSegment != null)
-            {
-                var nextSegment = _timelineData.GetNextSegment(_currentSegment);
-
-                if (nextSegment != null)
-                {
-                    await LoadVideoSegmentAsync(nextSegment);
-                }
-                else
-                {
-                    ShowStatus("Playback completed");
-                }
-            }
-        }
-
-        #endregion
     }
 }

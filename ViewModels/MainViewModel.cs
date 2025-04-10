@@ -1,4 +1,5 @@
-﻿using CCTVVideoEditor.Models;
+﻿using CCTVVideoEditor.Helpers;
+using CCTVVideoEditor.Models;
 using CCTVVideoEditor.Services;
 using Microsoft.UI.Xaml;
 using System;
@@ -12,22 +13,35 @@ using Windows.Storage.Pickers;
 namespace CCTVVideoEditor.ViewModels
 {
     /// <summary>
-    /// ViewModel for the main page
+    /// ViewModel for the main page with timeline support
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged
     {
+        // Services
         private readonly VideoLoaderService _videoLoaderService;
+        private readonly TimelineService _timelineService;
+        private readonly PlaybackService _playbackService;
 
+        // State
         private TimelineData _timelineData;
         private VideoSegment _currentSegment;
         private string _statusMessage = "Ready";
+        private string _loadingMessage = "Loading...";
         private bool _isVideoLoaded = false;
         private bool _isLoading = false;
+        private bool _isSelectionActive = false;
+        private DateTime _selectionStartTime;
+        private DateTime _selectionEndTime;
+        private DateTime _currentTime;
+        private string _currentTimeText = "--:--:--";
+        private string _currentSegmentInfo = "No video loaded";
 
         /// <summary>
         /// Event that fires when a property changes
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
+
+        #region Properties
 
         /// <summary>
         /// The current timeline data
@@ -44,7 +58,16 @@ namespace CCTVVideoEditor.ViewModels
         public VideoSegment CurrentSegment
         {
             get => _currentSegment;
-            private set => SetProperty(ref _currentSegment, value);
+            private set
+            {
+                if (SetProperty(ref _currentSegment, value))
+                {
+                    // Update segment info
+                    CurrentSegmentInfo = value != null ?
+                        $"{value.StartTime:HH:mm:ss} - {value.Duration / 60:F1} min" :
+                        "No video loaded";
+                }
+            }
         }
 
         /// <summary>
@@ -54,6 +77,15 @@ namespace CCTVVideoEditor.ViewModels
         {
             get => _statusMessage;
             private set => SetProperty(ref _statusMessage, value);
+        }
+
+        /// <summary>
+        /// Loading message to display
+        /// </summary>
+        public string LoadingMessage
+        {
+            get => _loadingMessage;
+            private set => SetProperty(ref _loadingMessage, value);
         }
 
         /// <summary>
@@ -75,12 +107,99 @@ namespace CCTVVideoEditor.ViewModels
         }
 
         /// <summary>
+        /// Whether the empty state should be visible
+        /// </summary>
+        public bool IsEmptyStateVisible => !IsVideoLoaded && !IsLoading;
+
+        /// <summary>
+        /// Whether a time range is selected
+        /// </summary>
+        public bool IsSelectionActive
+        {
+            get => _isSelectionActive;
+            private set => SetProperty(ref _isSelectionActive, value);
+        }
+
+        /// <summary>
+        /// Selection start time
+        /// </summary>
+        public DateTime SelectionStartTime
+        {
+            get => _selectionStartTime;
+            private set => SetProperty(ref _selectionStartTime, value);
+        }
+
+        /// <summary>
+        /// Selection end time
+        /// </summary>
+        public DateTime SelectionEndTime
+        {
+            get => _selectionEndTime;
+            private set => SetProperty(ref _selectionEndTime, value);
+        }
+
+        /// <summary>
+        /// Current playback time
+        /// </summary>
+        public DateTime CurrentTime
+        {
+            get => _currentTime;
+            private set
+            {
+                if (SetProperty(ref _currentTime, value))
+                {
+                    // Update time text
+                    CurrentTimeText = TimeHelper.FormatTimestamp(value, false);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Current time as text
+        /// </summary>
+        public string CurrentTimeText
+        {
+            get => _currentTimeText;
+            private set => SetProperty(ref _currentTimeText, value);
+        }
+
+        /// <summary>
+        /// Current segment info
+        /// </summary>
+        public string CurrentSegmentInfo
+        {
+            get => _currentSegmentInfo;
+            private set => SetProperty(ref _currentSegmentInfo, value);
+        }
+
+        /// <summary>
+        /// Gets the media player for binding
+        /// </summary>
+        public Windows.Media.Playback.MediaPlayer MediaPlayer => _playbackService?.MediaPlayer;
+
+        #endregion
+
+        /// <summary>
         /// Creates a new MainViewModel
         /// </summary>
         public MainViewModel()
         {
             _videoLoaderService = new VideoLoaderService();
+            _timelineService = new TimelineService();
+            _playbackService = new PlaybackService(_timelineService);
+
+            // Set up event handlers
+            _timelineService.CurrentSegmentChanged += TimelineService_CurrentSegmentChanged;
+            _timelineService.CurrentPositionChanged += TimelineService_CurrentPositionChanged;
+
+            _playbackService.PlaybackStarted += PlaybackService_PlaybackStarted;
+            _playbackService.PlaybackEnded += PlaybackService_PlaybackEnded;
+            _playbackService.SegmentChanged += PlaybackService_SegmentChanged;
+            _playbackService.PositionChanged += PlaybackService_PositionChanged;
+            _playbackService.PlaybackError += PlaybackService_PlaybackError;
         }
+
+        #region Public Methods
 
         /// <summary>
         /// Loads videos from a selected folder
@@ -90,6 +209,7 @@ namespace CCTVVideoEditor.ViewModels
             try
             {
                 IsLoading = true;
+                LoadingMessage = "Selecting folder...";
                 StatusMessage = "Selecting folder...";
 
                 // Show folder picker
@@ -106,6 +226,7 @@ namespace CCTVVideoEditor.ViewModels
 
                 if (folder != null)
                 {
+                    LoadingMessage = "Loading videos...";
                     StatusMessage = "Loading videos...";
 
                     // Load videos from the selected folder
@@ -114,14 +235,20 @@ namespace CCTVVideoEditor.ViewModels
                     // Check if any videos were found
                     if (TimelineData.SegmentCount > 0)
                     {
+                        // Initialize timeline service
+                        _timelineService.Initialize(TimelineData);
+
                         // Get first segment
                         var firstSegment = TimelineData.GetAllSegments()[0];
 
-                        // Set current segment
-                        CurrentSegment = firstSegment;
+                        // Play the first video
+                        await _playbackService.PlaySegmentAsync(firstSegment);
 
                         // Mark video as loaded
                         IsVideoLoaded = true;
+
+                        // Clear selection
+                        ClearSelection();
 
                         // Show success status
                         StatusMessage = $"Loaded {TimelineData.SegmentCount} videos";
@@ -155,72 +282,135 @@ namespace CCTVVideoEditor.ViewModels
         }
 
         /// <summary>
-        /// Gets the next video segment
+        /// Plays or pauses the current video
         /// </summary>
-        public VideoSegment GetNextSegment()
+        public void PlayPause()
         {
-            if (TimelineData == null || CurrentSegment == null)
-                return null;
+            _playbackService.PlayPause();
+        }
 
-            var nextSegment = TimelineData.GetNextSegment(CurrentSegment);
+        /// <summary>
+        /// Stops playback
+        /// </summary>
+        public void Stop()
+        {
+            _playbackService.Stop();
+        }
 
-            if (nextSegment != null)
+        /// <summary>
+        /// Moves to the next segment
+        /// </summary>
+        /// <returns>Task</returns>
+        public async Task MoveToNextSegmentAsync()
+        {
+            await _playbackService.MoveToNextSegmentAsync();
+        }
+
+        /// <summary>
+        /// Moves to the previous segment
+        /// </summary>
+        /// <returns>Task</returns>
+        public async Task MoveToPreviousSegmentAsync()
+        {
+            await _playbackService.MoveToPreviousSegmentAsync();
+        }
+
+        /// <summary>
+        /// Seek to a specific time in the timeline
+        /// </summary>
+        /// <param name="time">Time to seek to</param>
+        /// <returns>Task</returns>
+        public async Task SeekToTimeAsync(DateTime time)
+        {
+            await _playbackService.SeekToTimeAsync(time);
+        }
+
+        /// <summary>
+        /// Sets the selection range
+        /// </summary>
+        /// <param name="startTime">Start time</param>
+        /// <param name="endTime">End time</param>
+        public void SetSelectionRange(DateTime startTime, DateTime endTime)
+        {
+            if (startTime < endTime)
             {
-                CurrentSegment = nextSegment;
-                return nextSegment;
-            }
-            else
-            {
-                StatusMessage = "This is the last video segment";
-                return null;
+                SelectionStartTime = startTime;
+                SelectionEndTime = endTime;
+                IsSelectionActive = true;
+
+                StatusMessage = $"Selected: {TimeHelper.FormatTimestamp(startTime)} - {TimeHelper.FormatTimestamp(endTime)}";
             }
         }
 
         /// <summary>
-        /// Gets the previous video segment
+        /// Clears the current selection
         /// </summary>
-        public VideoSegment GetPreviousSegment()
+        public void ClearSelection()
         {
-            if (TimelineData == null || CurrentSegment == null)
-                return null;
+            IsSelectionActive = false;
+            SelectionStartTime = DateTime.MinValue;
+            SelectionEndTime = DateTime.MinValue;
 
-            var prevSegment = TimelineData.GetPreviousSegment(CurrentSegment);
-
-            if (prevSegment != null)
-            {
-                CurrentSegment = prevSegment;
-                return prevSegment;
-            }
-            else
-            {
-                StatusMessage = "This is the first video segment";
-                return null;
-            }
+            StatusMessage = "Selection cleared";
         }
 
         /// <summary>
-        /// Gets all video segments
+        /// Gets the selected time range
         /// </summary>
-        public IReadOnlyList<VideoSegment> GetAllSegments()
+        /// <returns>Tuple of start and end times</returns>
+        public (DateTime start, DateTime end) GetSelectionRange()
         {
-            return TimelineData?.GetAllSegments();
+            return (SelectionStartTime, SelectionEndTime);
         }
 
         /// <summary>
-        /// Gets segments in a time range
+        /// Gets segments in the selected range
         /// </summary>
-        public List<VideoSegment> GetSegmentsInRange(DateTime startTime, DateTime endTime)
+        /// <returns>List of segments</returns>
+        public List<VideoSegment> GetSegmentsInSelectionRange()
         {
-            return TimelineData?.GetSegmentsInRange(startTime, endTime);
+            if (!IsSelectionActive || TimelineData == null)
+                return new List<VideoSegment>();
+
+            return TimelineData.GetSegmentsInRange(SelectionStartTime, SelectionEndTime);
         }
 
         /// <summary>
-        /// Finds gaps in the timeline
+        /// Gets the total duration of video in the selection
         /// </summary>
-        public List<(DateTime start, DateTime end)> FindGaps()
+        /// <returns>Duration in seconds</returns>
+        public double GetTotalDurationInSelection()
         {
-            return TimelineData?.FindGaps();
+            if (!IsSelectionActive || _timelineService == null)
+                return 0;
+
+            return _timelineService.GetTotalDurationInRange(SelectionStartTime, SelectionEndTime);
         }
+
+        /// <summary>
+        /// Checks if there are gaps in the selection
+        /// </summary>
+        /// <returns>True if gaps exist</returns>
+        public bool HasGapsInSelection()
+        {
+            if (!IsSelectionActive || _timelineService == null)
+                return false;
+
+            var gaps = _timelineService.FindGapsInRange(SelectionStartTime, SelectionEndTime);
+            return gaps.Count > 0;
+        }
+
+        /// <summary>
+        /// Cleanup resources
+        /// </summary>
+        public void Cleanup()
+        {
+            _playbackService.Cleanup();
+        }
+
+        #endregion
+
+        #region Private Methods
 
         /// <summary>
         /// Sets a property and notifies property changed
@@ -232,6 +422,13 @@ namespace CCTVVideoEditor.ViewModels
 
             storage = value;
             NotifyPropertyChanged(propertyName);
+
+            // Handle special cases
+            if (propertyName == nameof(IsVideoLoaded) || propertyName == nameof(IsLoading))
+            {
+                NotifyPropertyChanged(nameof(IsEmptyStateVisible));
+            }
+
             return true;
         }
 
@@ -242,5 +439,46 @@ namespace CCTVVideoEditor.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        #endregion
+
+        #region Event Handlers
+
+        private void TimelineService_CurrentSegmentChanged(object sender, VideoSegment e)
+        {
+            CurrentSegment = e;
+        }
+
+        private void TimelineService_CurrentPositionChanged(object sender, DateTime e)
+        {
+            CurrentTime = e;
+        }
+
+        private void PlaybackService_PlaybackStarted(object sender, VideoSegment e)
+        {
+            StatusMessage = $"Playing: {TimeHelper.FormatTimestamp(e.StartTime)}";
+        }
+
+        private void PlaybackService_PlaybackEnded(object sender, VideoSegment e)
+        {
+            StatusMessage = $"Playback ended: {TimeHelper.FormatTimestamp(e.EndTime)}";
+        }
+
+        private void PlaybackService_SegmentChanged(object sender, VideoSegment e)
+        {
+            // Already handled by TimelineService
+        }
+
+        private void PlaybackService_PositionChanged(object sender, DateTime e)
+        {
+            // Already handled by TimelineService
+        }
+
+        private void PlaybackService_PlaybackError(object sender, string e)
+        {
+            StatusMessage = $"Error: {e}";
+        }
+
+        #endregion
     }
 }
